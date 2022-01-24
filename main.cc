@@ -11,6 +11,7 @@
 #include "engine/engine.h"
 
 extern SDL_Window* GetWindow();
+constexpr int tickPerFrame = 1000 / 60;
 
 int main()
 {
@@ -33,6 +34,8 @@ int main()
     // Poll for user input.
     bool stillRunning = true;
     while(stillRunning) {
+		uint32_t frameBeginTick = SDL_GetTicks();
+
 
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
@@ -62,19 +65,14 @@ int main()
 			SDL_SetWindowPosition(GetWindow(), mouseX - deltaX, mouseY - deltaY);
 		}
 
-		// SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-		// SDL_RenderClear(renderer);
+		engine.DrawFrame();
+		
+		uint32_t frameEndTick = SDL_GetTicks();
+		int deltaTick = frameEndTick - frameBeginTick;
+		if (deltaTick < tickPerFrame) {
+			SDL_Delay(tickPerFrame - deltaTick);
+		}
 
-		engine.drawFrame();
-
-		SDL_Rect rect{ 100, 100, 100, 100 };
-
-		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 254);
-		SDL_RenderDrawRect(renderer, &rect);
-
-		SDL_RenderPresent(renderer);
-
-        SDL_Delay(10);
     }
 
     // Clean up.

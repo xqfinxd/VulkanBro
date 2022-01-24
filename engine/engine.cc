@@ -59,6 +59,32 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBits
 	return VK_FALSE;
 }
 
+void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT & createInfo) {
+	createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	createInfo.pfnUserCallback = debugCallback;
+}
+
+std::vector<char> readFile(const std::string & filename) {
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file!");
+	}
+
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+
+	file.close();
+
+	return buffer;
+}
+
 }
 
 void MEngine::AttachDevice() {
@@ -116,7 +142,7 @@ void MEngine::createInstance() {
 
 	VkApplicationInfo appInfo{};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "Hello Triangle";
+	appInfo.pApplicationName = "Hello Marble";
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -146,14 +172,6 @@ void MEngine::createInstance() {
 	if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create instance!");
 	}
-}
-
-void MEngine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT & createInfo) {
-	createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-	createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	createInfo.pfnUserCallback = debugCallback;
 }
 
 void MEngine::setupDebugMessenger() {
@@ -535,7 +553,7 @@ void MEngine::createCommandBuffers() {
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = swapchain_extent_;
 
-		VkClearValue clearColor = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
+		VkClearValue clearColor = { { { 1.0f, 1.0f, 1.0f, 1.0f } } };
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
@@ -575,7 +593,7 @@ void MEngine::createSyncObjects() {
 	}
 }
 
-void MEngine::drawFrame() {
+void MEngine::DrawFrame() {
 	vkWaitForFences(device_, 1, &inflight_fences_[current_frame_], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
@@ -801,23 +819,5 @@ bool MEngine::checkValidationLayerSupport() {
 	}
 
 	return true;
-}
-
-std::vector<char> MEngine::readFile(const std::string & filename) {
-	std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-	if (!file.is_open()) {
-		throw std::runtime_error("failed to open file!");
-	}
-
-	size_t fileSize = (size_t)file.tellg();
-	std::vector<char> buffer(fileSize);
-
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-
-	file.close();
-
-	return buffer;
 }
 

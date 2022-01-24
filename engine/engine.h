@@ -22,7 +22,7 @@ public:
 	void AttachDevice();
 	void DetachDevice();
 
-	void drawFrame();
+	void DrawFrame();
 
 private:
 	VkInstance instance_;
@@ -55,8 +55,8 @@ private:
 	std::vector<VkFence> images_inflight_;
 	size_t current_frame_ = 0;
 
+private:
 	void createInstance();
-	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 	void setupDebugMessenger();
 	void createSurface();
 	void pickPhysicalDevice();
@@ -80,5 +80,4 @@ private:
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	std::vector<const char*> getRequiredExtensions();
 	bool checkValidationLayerSupport();
-	static std::vector<char> readFile(const std::string& filename);
 };
