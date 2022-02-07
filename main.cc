@@ -9,6 +9,7 @@
 
 #include "engine/interfaces.h"
 #include "engine/engine.h"
+#include "engine/program.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "engine/stb_image.h"
@@ -18,7 +19,7 @@ constexpr int kTickPerFrame = 1000 / 10;
 int main()
 {
 	marble::ShowWindow();
-	marble::InitEngine();
+	marble::GetEngine().Init();
 
 	auto program = marble::CreateProgram();
 	
@@ -28,7 +29,7 @@ int main()
 	int delta_x = 0, delta_y = 0;
 	glm::ivec2 mouse_pos;
 
-	float x = -5, y = 5, z = -5;
+	float x = -13, y = 0, z = 1;
 
 	auto onkey = [](uint16_t key, float& x, float& y, float& z) {
 		switch (key) {
@@ -107,7 +108,7 @@ int main()
 
 	marble::DestoryProgram(program);
 
-	marble::QuitEngine();
+	marble::GetEngine().Quit();
 	marble::CloseWindow();
 
     return 0;

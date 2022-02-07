@@ -88,11 +88,13 @@
   <ItemGroup>
     <ClCompile Include="engine\engine.cc" />
     <ClCompile Include="engine\interfaces.cc" />
+    <ClCompile Include="engine\program.cc" />
     <ClCompile Include="main.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\engine.h" />
     <ClInclude Include="engine\interfaces.h" />
+    <ClInclude Include="engine\program.h" />
     <ClInclude Include="engine\stb_image.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

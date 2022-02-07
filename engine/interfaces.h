@@ -1,9 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 #include <glm/glm.hpp>
 
 namespace marble {
+
+std::vector<char> ReadFile(const char* filename);
 
 void ShowWindow();
 void CloseWindow();

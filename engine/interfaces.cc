@@ -1,6 +1,6 @@
 #include "interfaces.h"
 
-#include <stdexcept>
+#include <fstream>
 
 #include <SDL2/SDL.h>
 
@@ -55,6 +55,18 @@ glm::ivec2 GetMousePos() {
 	glm::ivec2 mouse_pos{};
 	SDL_GetGlobalMouseState(&mouse_pos.x, &mouse_pos.y);
 	return mouse_pos;
+}
+
+std::vector<char> ReadFile(const char * filename) {
+	std::ifstream fs{};
+	fs.open(filename, std::ios::binary);
+	fs.seekg(0, fs.end);
+	uint32_t length = (uint32_t)fs.tellg();
+	fs.seekg(0, fs.beg);
+	std::vector<char> data(length);
+	fs.read(data.data(), length);
+	fs.close();
+	return data;
 }
 
 }
