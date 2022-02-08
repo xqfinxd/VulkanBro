@@ -125,39 +125,8 @@ void Program::CreateDescriptorPool() {
 }
 
 void Program::CreateUniformBuffer() {
-	VkBufferCreateInfo buf_info = {};
-	buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buf_info.pNext = nullptr;
-	buf_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	buf_info.size = sizeof(glm::mat4);
-	buf_info.queueFamilyIndexCount = 0;
-	buf_info.pQueueFamilyIndices = nullptr;
-	buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	buf_info.flags = 0;
-	auto res = vkCreateBuffer(GetEngine().device, &buf_info, nullptr, &uniform_buffer.buffer);
-	assert(res == VK_SUCCESS);
-
-	VkMemoryRequirements mem_reqs;
-	vkGetBufferMemoryRequirements(GetEngine().device, uniform_buffer.buffer, &mem_reqs);
-
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = nullptr;
-	alloc_info.memoryTypeIndex = 0;
-
-	alloc_info.allocationSize = mem_reqs.size;
-	bool pass = GetEngine().GetMemoryType(mem_reqs.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		alloc_info.memoryTypeIndex);
-	assert(pass && "No mappable, coherent memory");
-
-	res = vkAllocateMemory(GetEngine().device, &alloc_info, nullptr, &uniform_buffer.memory);
-	assert(res == VK_SUCCESS);
-
-	res = vkBindBufferMemory(GetEngine().device, uniform_buffer.buffer, uniform_buffer.memory, 0);
-	assert(res == VK_SUCCESS);
-
-	uniform_buffer.size = sizeof(glm::mat4);
+	uniform_buffer.BindBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	uniform_buffer.BufferData(sizeof(glm::mat4), nullptr);
 }
 
 void Program::CreateImage(const char * image) {
@@ -279,87 +248,15 @@ void Program::CreateSampler() {
 }
 
 void Program::AddVertexBuffer(float * data, size_t size) {
-	VkBufferDescriptor v_buffer;
-	v_buffer.size = size;
-	VkBufferCreateInfo buf_info = {};
-	buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buf_info.pNext = nullptr;
-	buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	buf_info.size = size;
-	buf_info.queueFamilyIndexCount = 0;
-	buf_info.pQueueFamilyIndices = nullptr;
-	buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	buf_info.flags = 0;
-	auto res = vkCreateBuffer(GetEngine().device, &buf_info, nullptr, &v_buffer.buffer);
-	assert(res == VK_SUCCESS);
-
-	VkMemoryRequirements mem_reqs;
-	vkGetBufferMemoryRequirements(GetEngine().device, v_buffer.buffer, &mem_reqs);
-
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = nullptr;
-	alloc_info.memoryTypeIndex = 0;
-
-	alloc_info.allocationSize = mem_reqs.size;
-	bool pass = GetEngine().GetMemoryType(mem_reqs.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		alloc_info.memoryTypeIndex);
-	assert(pass && "No mappable, coherent memory");
-
-	res = vkAllocateMemory(GetEngine().device, &alloc_info, nullptr, &v_buffer.memory);
-	assert(res == VK_SUCCESS);
-
-	res = vkBindBufferMemory(GetEngine().device, v_buffer.buffer, v_buffer.memory, 0);
-	assert(res == VK_SUCCESS);
-
-	void* dest_data = nullptr;
-	res = vkMapMemory(GetEngine().device, v_buffer.memory, 0, mem_reqs.size, 0, &dest_data);
-	assert(res == VK_SUCCESS);
-	memcpy(dest_data, data, size);
-	vkUnmapMemory(GetEngine().device, v_buffer.memory);
+	Buffer v_buffer;
+	v_buffer.BindBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	v_buffer.BufferData(size, data);
 	vertex_buffers.push_back(v_buffer);
 }
 
 void Program::CreateIndexBuffer(uint32_t * data, size_t size) {
-	index_buffer.size = size;
-	VkBufferCreateInfo buf_info = {};
-	buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buf_info.pNext = nullptr;
-	buf_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	buf_info.size = size;
-	buf_info.queueFamilyIndexCount = 0;
-	buf_info.pQueueFamilyIndices = nullptr;
-	buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	buf_info.flags = 0;
-	auto res = vkCreateBuffer(GetEngine().device, &buf_info, nullptr, &index_buffer.buffer);
-	assert(res == VK_SUCCESS);
-
-	VkMemoryRequirements mem_reqs;
-	vkGetBufferMemoryRequirements(GetEngine().device, index_buffer.buffer, &mem_reqs);
-
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = nullptr;
-	alloc_info.memoryTypeIndex = 0;
-
-	alloc_info.allocationSize = mem_reqs.size;
-	bool pass = GetEngine().GetMemoryType(mem_reqs.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		alloc_info.memoryTypeIndex);
-	assert(pass && "No mappable, coherent memory");
-
-	res = vkAllocateMemory(GetEngine().device, &alloc_info, nullptr, &index_buffer.memory);
-	assert(res == VK_SUCCESS);
-
-	res = vkBindBufferMemory(GetEngine().device, index_buffer.buffer, index_buffer.memory, 0);
-	assert(res == VK_SUCCESS);
-
-	void* dest_data = nullptr;
-	res = vkMapMemory(GetEngine().device, index_buffer.memory, 0, mem_reqs.size, 0, &dest_data);
-	assert(res == VK_SUCCESS);
-	memcpy(dest_data, data, size);
-	vkUnmapMemory(GetEngine().device, index_buffer.memory);
+	index_buffer.BindBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	index_buffer.BufferData(size, data);
 }
 
 void Program::VertexBinding(uint32_t binding, uint32_t stride) {
@@ -795,10 +692,8 @@ void Program::Update(float x, float y, float z) {
 	auto clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.5f, 1.0f);
 
 	auto MVP = clip * projection * view * model;
-	void* dest_data = nullptr;
-	vkMapMemory(GetEngine().device, uniform_buffer.memory, 0, sizeof(MVP), 0, &dest_data);
-	memcpy(dest_data, &MVP, sizeof(MVP));
-	vkUnmapMemory(GetEngine().device, uniform_buffer.memory);
+
+	GetEngine().CopyData(uniform_buffer.memory, &MVP, sizeof(MVP));
 }
 
 void Program::Clear() {
@@ -821,13 +716,10 @@ void Program::Clear() {
 	vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
 	// vkFreeDescriptorSets(device, descriptor_pool, 1, &descriptor_set);
 	vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
-	vkDestroyBuffer(device, index_buffer.buffer, nullptr);
-	vkFreeMemory(device, index_buffer.memory, nullptr);
-	vkDestroyBuffer(device, uniform_buffer.buffer, nullptr);
-	vkFreeMemory(device, uniform_buffer.memory, nullptr);
+	index_buffer.Clear();
+	uniform_buffer.Clear();
 	for (auto& buffer : vertex_buffers) {
-		vkDestroyBuffer(device, buffer.buffer, nullptr);
-		vkFreeMemory(device, buffer.memory, nullptr);
+		buffer.Clear();
 	}
 	vkDestroySampler(device, sampler, nullptr);
 	vkDestroyImage(device, sampled_image.image, nullptr);

@@ -7,23 +7,33 @@
 #include <glm/glm.hpp>
 
 #include "engine.h"
+#include "buffer.h"
 
 namespace marble {
 
 struct Program {
+public:
 	Program();
+
+	void Build();
+
+	void Draw();
+
+	void Update(float x, float y, float z);
+
+	void Clear();
 
 	std::vector<VkCommandBuffer> cmds;
 	VkRenderPass renderpass;
 	std::vector<VkFramebuffer> framebuffers;
 	VkDescriptorPool descriptor_pool;
 
-	VkBufferDescriptor uniform_buffer;
+	Buffer uniform_buffer;
 	VkImageDescriptor sampled_image;
 	VkSampler sampler;
 
-	std::vector<VkBufferDescriptor> vertex_buffers;
-	VkBufferDescriptor index_buffer;
+	std::vector<Buffer> vertex_buffers;
+	Buffer index_buffer;
 
 	std::vector<VkVertexInputBindingDescription> vertex_bindings;
 	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
@@ -36,6 +46,8 @@ struct Program {
 	VkPipelineCache cache;
 
 	std::map<VkShaderStageFlagBits, VkShaderModule> shader_modules;
+
+private:
 
 	void CreateRenderpass();
 
@@ -67,13 +79,6 @@ struct Program {
 
 	void CreatePipeline();
 
-	void Build();
-
-	void Draw();
-
-	void Update(float x, float y, float z);
-
-	void Clear();
 };
 
 Program* CreateProgram();

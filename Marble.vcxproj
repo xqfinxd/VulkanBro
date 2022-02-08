@@ -86,12 +86,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="engine\buffer.cc" />
     <ClCompile Include="engine\engine.cc" />
     <ClCompile Include="engine\interfaces.cc" />
     <ClCompile Include="engine\program.cc" />
     <ClCompile Include="main.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="engine\buffer.h" />
     <ClInclude Include="engine\engine.h" />
     <ClInclude Include="engine\interfaces.h" />
     <ClInclude Include="engine\program.h" />

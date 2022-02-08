@@ -73,6 +73,11 @@ public:
 
 	void SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout old_image_layout,
 		VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);
+	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
+		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& memory);
+	void DestroyBuffer(VkBuffer& buffer, VkDeviceMemory& memory);
+	void CopyBuffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
+	void CopyData(VkDeviceMemory& memory, void* data, size_t size);
 
 	void CreateShaderModule(VkShaderModule& shader_module, uint32_t* data, size_t size);
 	void DestroyShaderModule(VkShaderModule& shader_module);
@@ -108,6 +113,9 @@ private:
 
 	void CreateCmdPool();
 	void DestroyCmdPool();
+
+	VkCommandBuffer BeginOnceCmd();
+	void EndOnceCmd(VkCommandBuffer& cmd);
 
 };
 

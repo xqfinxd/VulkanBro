@@ -28,6 +28,9 @@
     <ClCompile Include="engine\program.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="engine\buffer.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\engine.h">
@@ -40,6 +43,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="engine\program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -112,16 +112,7 @@ bool Engine::NextImage() {
 }
 
 void Engine::SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout old_image_layout, VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages) {
-	VkResult res;
-	auto cmd = GenCmd(false, false);
-
-	VkCommandBufferBeginInfo cmd_begin_info = {};
-	cmd_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	cmd_begin_info.pNext = NULL;
-	cmd_begin_info.flags = 0;
-	cmd_begin_info.pInheritanceInfo = NULL;
-
-	vkBeginCommandBuffer(cmd, &cmd_begin_info);
+	auto cmd = BeginOnceCmd();
 
 	VkImageMemoryBarrier image_memory_barrier = {};
 	image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -158,34 +149,59 @@ void Engine::SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkIma
 
 	vkCmdPipelineBarrier(cmd, src_stages, dest_stages, 0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
-	vkEndCommandBuffer(cmd);
+	EndOnceCmd(cmd);
+}
 
-	const VkCommandBuffer cmd_bufs[] = { cmd };
-	VkFenceCreateInfo fenceInfo;
-	VkFence cmdFence;
-	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceInfo.pNext = nullptr;
-	fenceInfo.flags = 0;
-	vkCreateFence(device, &fenceInfo, NULL, &cmdFence);
+void Engine::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+	VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory & memory) {
 
-	VkSubmitInfo submit_info[1] = {};
-	submit_info[0].pNext = nullptr;
-	submit_info[0].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info[0].waitSemaphoreCount = 0;
-	submit_info[0].pWaitSemaphores = nullptr;
-	submit_info[0].pWaitDstStageMask = nullptr;
-	submit_info[0].commandBufferCount = 1;
-	submit_info[0].pCommandBuffers = cmd_bufs;
-	submit_info[0].signalSemaphoreCount = 0;
-	submit_info[0].pSignalSemaphores = nullptr;
+	VkBufferCreateInfo buffer_info{};
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.size = size;
+	buffer_info.usage = usage;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	res = vkQueueSubmit(graphics_queue, 1, submit_info, cmdFence);
-	assert(res == VK_SUCCESS);
+	auto res = vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
+	assert(VK_SUCCESS == res);
 
-	vkWaitForFences(device, 1, &cmdFence, VK_TRUE, UINT64_MAX);
+	VkMemoryRequirements mem_req;
+	vkGetBufferMemoryRequirements(device, buffer, &mem_req);
 
-	vkDestroyFence(device, cmdFence, nullptr);
-	FreeCmd(cmd);
+	VkMemoryAllocateInfo alloc_info{};
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	bool pass = GetMemoryType(mem_req.memoryTypeBits, properties, alloc_info.memoryTypeIndex);
+	assert(pass);
+
+	res = vkAllocateMemory(device, &alloc_info, nullptr, &memory);
+	assert(VK_SUCCESS == res);
+
+	res = vkBindBufferMemory(device, buffer, memory, 0);
+	assert(VK_SUCCESS == res);
+}
+
+void Engine::DestroyBuffer(VkBuffer & buffer, VkDeviceMemory & memory) {
+	vkDestroyBuffer(device, buffer, nullptr);
+	vkFreeMemory(device, memory, nullptr);
+}
+
+void Engine::CopyBuffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size) {
+	auto cmd = BeginOnceCmd();
+
+	VkBufferCopy copy_region{};
+	copy_region.srcOffset = 0;
+	copy_region.dstOffset = 0;
+	copy_region.size = size;
+	vkCmdCopyBuffer(cmd, src_buf, dst_buf, 1, &copy_region);
+
+	EndOnceCmd(cmd);
+}
+
+void Engine::CopyData(VkDeviceMemory & memory, void * data, size_t size) {
+	void* dest_data;
+	vkMapMemory(device, memory, 0, size, 0, &dest_data);
+	memcpy(dest_data, data, size);
+	vkUnmapMemory(device, memory);
 }
 
 void Engine::CreateShaderModule(VkShaderModule & shader_module, uint32_t * data, size_t size) {
@@ -665,6 +681,53 @@ void Engine::CreateCmdPool() {
 void Engine::DestroyCmdPool() {
 	vkFreeCommandBuffers(device, cmd_pool, (uint32_t)cmds.size(), cmds.data());
 	vkDestroyCommandPool(device, cmd_pool, nullptr);
+}
+
+VkCommandBuffer Engine::BeginOnceCmd() {
+	auto cmd = GenCmd(false, false);
+
+	VkCommandBufferBeginInfo cmd_begin_info = {};
+	cmd_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	cmd_begin_info.pNext = NULL;
+	cmd_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	cmd_begin_info.pInheritanceInfo = NULL;
+
+	vkBeginCommandBuffer(cmd, &cmd_begin_info);
+	return cmd;
+}
+
+void Engine::EndOnceCmd(VkCommandBuffer & cmd) {
+	VkResult res;
+	res = vkEndCommandBuffer(cmd);
+	assert(VK_SUCCESS == res);
+
+	const VkCommandBuffer cmd_bufs[] = { cmd };
+	VkFenceCreateInfo fenceInfo;
+	VkFence cmdFence;
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.pNext = nullptr;
+	fenceInfo.flags = 0;
+	res = vkCreateFence(device, &fenceInfo, NULL, &cmdFence);
+	assert(VK_SUCCESS == res);
+
+	VkSubmitInfo submit_info[1] = {};
+	submit_info[0].pNext = nullptr;
+	submit_info[0].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info[0].waitSemaphoreCount = 0;
+	submit_info[0].pWaitSemaphores = nullptr;
+	submit_info[0].pWaitDstStageMask = nullptr;
+	submit_info[0].commandBufferCount = 1;
+	submit_info[0].pCommandBuffers = cmd_bufs;
+	submit_info[0].signalSemaphoreCount = 0;
+	submit_info[0].pSignalSemaphores = nullptr;
+
+	res = vkQueueSubmit(graphics_queue, 1, submit_info, cmdFence);
+	assert(res == VK_SUCCESS);
+
+	vkWaitForFences(device, 1, &cmdFence, VK_TRUE, UINT64_MAX);
+
+	vkDestroyFence(device, cmdFence, nullptr);
+	FreeCmd(cmd);
 }
 
 Engine & GetEngine() {
