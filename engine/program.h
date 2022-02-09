@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 
 #include "engine.h"
-#include "buffer.h"
+#include "element.h"
 
 namespace marble {
 
@@ -29,7 +29,7 @@ public:
 	VkDescriptorPool descriptor_pool;
 
 	Buffer uniform_buffer;
-	VkImageDescriptor sampled_image;
+	Texture sampled_image;
 	VkSampler sampler;
 
 	std::vector<Buffer> vertex_buffers;

@@ -132,16 +132,16 @@ void Engine::SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkIma
 
 	static std::map<VkImageLayout, VkAccessFlags> old_image_layout_map = {
 		{ VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT },
-	{ VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT },
-	{ VK_IMAGE_LAYOUT_PREINITIALIZED, VK_ACCESS_HOST_WRITE_BIT },
+		{ VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT },
+		{ VK_IMAGE_LAYOUT_PREINITIALIZED, VK_ACCESS_HOST_WRITE_BIT },
 	};
 
 	static std::map<VkImageLayout, VkAccessFlags> new_image_layout_map = {
 		{ VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT },
-	{ VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT },
-	{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT },
-	{ VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT },
-	{ VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT },
+		{ VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT },
+		{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT },
+		{ VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT },
+		{ VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT },
 	};
 
 	image_memory_barrier.srcAccessMask = old_image_layout_map[old_image_layout];
@@ -185,6 +185,68 @@ void Engine::DestroyBuffer(VkBuffer & buffer, VkDeviceMemory & memory) {
 	vkFreeMemory(device, memory, nullptr);
 }
 
+void Engine::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & memory) {
+	VkResult res;
+
+	VkImageCreateInfo image_info{};
+	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_info.imageType = VK_IMAGE_TYPE_2D;
+	image_info.extent.width = width;
+	image_info.extent.height = height;
+	image_info.extent.depth = 1;
+	image_info.mipLevels = mipLevels;
+	image_info.arrayLayers = 1;
+	image_info.format = format;
+	image_info.tiling = tiling;
+	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	image_info.usage = usage;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	res = vkCreateImage(device, &image_info, nullptr, &image);
+	assert(VK_SUCCESS == res);
+
+	VkMemoryRequirements mem_req;
+	vkGetImageMemoryRequirements(device, image, &mem_req);
+
+	VkMemoryAllocateInfo alloc_info{};
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_req.size;
+	auto pass = GetMemoryType(mem_req.memoryTypeBits, properties, alloc_info.memoryTypeIndex);
+	assert(pass);
+
+	res = vkAllocateMemory(device, &alloc_info, nullptr, &memory);
+	assert(VK_SUCCESS == res);
+
+	res = vkBindImageMemory(device, image, memory, 0);
+	assert(VK_SUCCESS == res);
+}
+
+void Engine::DestroyImage(VkImage & image, VkDeviceMemory & memory) {
+	vkDestroyImage(device, image, nullptr);
+	vkFreeMemory(device, memory, nullptr);
+}
+
+void Engine::CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags, uint32_t miplevels, VkImageView & view) {
+	VkImageViewCreateInfo view_info{};
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.image = image;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_info.format = format;
+	view_info.subresourceRange.aspectMask = aspect_flags;
+	view_info.subresourceRange.baseMipLevel = 0;
+	view_info.subresourceRange.levelCount = miplevels;
+	view_info.subresourceRange.baseArrayLayer = 0;
+	view_info.subresourceRange.layerCount = 1;
+
+	auto res = vkCreateImageView(device, &view_info, nullptr, &view);
+	assert(VK_SUCCESS == res);
+}
+
+void Engine::DestroyImageView(VkImageView & view) {
+	vkDestroyImageView(device, view, nullptr);
+}
+
 void Engine::CopyBuffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size) {
 	auto cmd = BeginOnceCmd();
 
@@ -202,6 +264,28 @@ void Engine::CopyData(VkDeviceMemory & memory, void * data, size_t size) {
 	vkMapMemory(device, memory, 0, size, 0, &dest_data);
 	memcpy(dest_data, data, size);
 	vkUnmapMemory(device, memory);
+}
+
+void Engine::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+	auto cmd = BeginOnceCmd();
+
+	VkBufferImageCopy region{};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageOffset = { 0, 0, 0 };
+	region.imageExtent = {
+		width,
+		height,
+		1
+	};
+	vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+	EndOnceCmd(cmd);
 }
 
 void Engine::CreateShaderModule(VkShaderModule & shader_module, uint32_t * data, size_t size) {
@@ -679,7 +763,9 @@ void Engine::CreateCmdPool() {
 }
 
 void Engine::DestroyCmdPool() {
-	vkFreeCommandBuffers(device, cmd_pool, (uint32_t)cmds.size(), cmds.data());
+	if (!cmds.empty()) {
+		vkFreeCommandBuffers(device, cmd_pool, (uint32_t)cmds.size(), cmds.data());
+	}
 	vkDestroyCommandPool(device, cmd_pool, nullptr);
 }
 

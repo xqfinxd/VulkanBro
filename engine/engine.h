@@ -73,11 +73,20 @@ public:
 
 	void SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout old_image_layout,
 		VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);
+
 	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& memory);
 	void DestroyBuffer(VkBuffer& buffer, VkDeviceMemory& memory);
+
+	void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& memory);
+	void DestroyImage(VkImage& image, VkDeviceMemory& memory);
+
+	void CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags, uint32_t miplevels, VkImageView& view);
+	void DestroyImageView(VkImageView& view);
+
 	void CopyBuffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
 	void CopyData(VkDeviceMemory& memory, void* data, size_t size);
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	void CreateShaderModule(VkShaderModule& shader_module, uint32_t* data, size_t size);
 	void DestroyShaderModule(VkShaderModule& shader_module);

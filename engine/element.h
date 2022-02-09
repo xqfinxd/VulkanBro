@@ -20,8 +20,23 @@ public:
 	VkDeviceSize size{ 0 };
 	VkDeviceSize offset{ 0 };
 	VkBufferUsageFlagBits usage;
+};
 
 
+struct Texture {
+	Texture();
+
+	void TexImage2D(uint32_t width, uint32_t height, uint32_t channel, void* data);
+
+	void Clear();
+
+	VkImage image;
+	VkImageView view;
+	VkDeviceMemory memory;
+	uint32_t width{ 0 };
+	uint32_t height{ 0 };
+	uint32_t channel{ 0 };
+	VkFormat format{ VK_FORMAT_UNDEFINED };
 };
 
 }

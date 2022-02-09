@@ -132,96 +132,10 @@ void Program::CreateUniformBuffer() {
 void Program::CreateImage(const char * image) {
 	int width = 0, height = 0, channel = 0;
 	unsigned char* image_data = stbi_load(image, &width, &height, &channel, 4);
-	sampled_image.format = VK_FORMAT_R8G8B8A8_UNORM;
-
-	VkImageCreateInfo image_create_info = {};
-	image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	image_create_info.pNext = nullptr;
-	image_create_info.imageType = VK_IMAGE_TYPE_2D;
-	image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-	image_create_info.extent.width = width;
-	image_create_info.extent.height = height;
-	image_create_info.extent.depth = 1;
-	image_create_info.mipLevels = 1;
-	image_create_info.arrayLayers = 1;
-	image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-	image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
-	image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-	image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-	image_create_info.queueFamilyIndexCount = 0;
-	image_create_info.pQueueFamilyIndices = nullptr;
-	image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	image_create_info.flags = 0;
-
-	VkMemoryAllocateInfo mem_alloc = {};
-	mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	mem_alloc.pNext = nullptr;
-	mem_alloc.allocationSize = 0;
-	mem_alloc.memoryTypeIndex = 0;
-
-	VkMemoryRequirements mem_reqs;
-
-	auto res = vkCreateImage(GetEngine().device, &image_create_info, nullptr, &sampled_image.image);
-	assert(res == VK_SUCCESS);
-
-	vkGetImageMemoryRequirements(GetEngine().device, sampled_image.image, &mem_reqs);
-
-	mem_alloc.allocationSize = mem_reqs.size;
-
-	VkFlags requirements = (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	bool pass = GetEngine().GetMemoryType(mem_reqs.memoryTypeBits, requirements, mem_alloc.memoryTypeIndex);
-	assert(pass);
-
-	res = vkAllocateMemory(GetEngine().device, &mem_alloc, nullptr, &(sampled_image.memory));
-	assert(res == VK_SUCCESS);
-
-	res = vkBindImageMemory(GetEngine().device, sampled_image.image, sampled_image.memory, 0);
-	assert(res == VK_SUCCESS);
-
-	VkImageSubresource subres = {};
-	subres.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subres.mipLevel = 0;
-	subres.arrayLayer = 0;
-
-	VkSubresourceLayout layout = {};
-	void *data;
-	vkGetImageSubresourceLayout(GetEngine().device, sampled_image.image, &subres, &layout);
-
-	res = vkMapMemory(GetEngine().device, sampled_image.memory, 0, mem_reqs.size, 0, &data);
-	assert(res == VK_SUCCESS);
-
-	memcpy(data, image_data, width * height * channel);
+	
+	sampled_image.TexImage2D(width, height, 4, image_data);
 
 	stbi_image_free(image_data);
-
-	vkUnmapMemory(GetEngine().device, sampled_image.memory);
-
-	VkImageViewCreateInfo view_info = {};
-	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view_info.pNext = nullptr;
-	view_info.image = VK_NULL_HANDLE;
-	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	view_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-	view_info.components.r = VK_COMPONENT_SWIZZLE_R;
-	view_info.components.g = VK_COMPONENT_SWIZZLE_G;
-	view_info.components.b = VK_COMPONENT_SWIZZLE_B;
-	view_info.components.a = VK_COMPONENT_SWIZZLE_A;
-	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	view_info.subresourceRange.baseMipLevel = 0;
-	view_info.subresourceRange.levelCount = 1;
-	view_info.subresourceRange.baseArrayLayer = 0;
-	view_info.subresourceRange.layerCount = 1;
-
-	view_info.image = sampled_image.image;
-	res = vkCreateImageView(GetEngine().device, &view_info, nullptr, &sampled_image.view);
-	assert(res == VK_SUCCESS);
-
-	GetEngine().SetImageLayout(sampled_image.image,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_PREINITIALIZED,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_HOST_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 }
 
 void Program::CreateSampler() {
@@ -255,7 +169,7 @@ void Program::AddVertexBuffer(float * data, size_t size) {
 }
 
 void Program::CreateIndexBuffer(uint32_t * data, size_t size) {
-	index_buffer.BindBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	index_buffer.BindBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	index_buffer.BufferData(size, data);
 }
 
@@ -401,7 +315,7 @@ void Program::CreatePipeline() {
 	ia.pNext = NULL;
 	ia.flags = 0;
 	ia.primitiveRestartEnable = VK_FALSE;
-	ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
 	VkPipelineRasterizationStateCreateInfo rs;
 	rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -550,20 +464,20 @@ void Program::Build() {
 	CreateUniformBuffer();
 
 	float vertices[] = {
-		-1.0f, -1.0f, -1.0f, 1.0f,
 		-1.0f,  1.0f,  1.0f, 1.0f,
+		 1.0f,  1.0f,  1.0f, 1.0f,
+		 1.0f, -1.0f,  1.0f, 1.0f,
 		-1.0f, -1.0f,  1.0f, 1.0f,
-		-1.0f,  1.0f, -1.0f, 1.0f,
 	};
 	float uvs[] = {
 		0.0f,  0.0f,
-		0.0f,  1.0f,
+		1.0f,  0.0f,
 		1.0f,  1.0f,
-		1.0f,  0.0f
+		0.0f,  1.0f
 	};
 	uint32_t indices[] = {
 		0, 1, 2,
-		1, 0, 3
+		0, 3, 2
 	};
 	AddVertexBuffer(vertices, sizeof(vertices));
 	AddVertexBuffer(uvs, sizeof(uvs));
@@ -722,9 +636,7 @@ void Program::Clear() {
 		buffer.Clear();
 	}
 	vkDestroySampler(device, sampler, nullptr);
-	vkDestroyImage(device, sampled_image.image, nullptr);
-	vkDestroyImageView(device, sampled_image.view, nullptr);
-	vkFreeMemory(device, sampled_image.memory, nullptr);
+	sampled_image.Clear();
 }
 
 Program * CreateProgram() {

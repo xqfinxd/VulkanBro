@@ -29,7 +29,7 @@ int main()
 	int delta_x = 0, delta_y = 0;
 	glm::ivec2 mouse_pos;
 
-	float x = -13, y = 0, z = 1;
+	float x = 0, y = 0, z = 10;
 
 	auto onkey = [](uint16_t key, float& x, float& y, float& z) {
 		switch (key) {
