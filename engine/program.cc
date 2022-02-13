@@ -15,6 +15,12 @@ Program::Program() {
 	
 }
 
+void Program::GetLayout() {
+	CreateLayout();
+	CreateDescriptorPool();
+	CreateDescriptorSet();
+}
+
 void Program::CreateRenderpass() {
 	VkAttachmentDescription attachments[2];
 	attachments[0].format = GetEngine().format;
@@ -107,58 +113,90 @@ void Program::CreateFramebuffers() {
 }
 
 void Program::CreateDescriptorPool() {
-	VkDescriptorPoolSize type_count[2];
-	type_count[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	type_count[0].descriptorCount = 1;
-	type_count[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	type_count[1].descriptorCount = 1;
+	std::map<VkDescriptorType, uint32_t> type_counts{};
+	for (const auto& sl : shader_layouts) {
+		type_counts[sl.second.descriptorType] += sl.second.descriptorCount;
+	}
+
+	std::vector<VkDescriptorPoolSize> pool_sizes{};
+	for (const auto& tc : type_counts) {
+		VkDescriptorPoolSize ps;
+		ps.type = tc.first;
+		ps.descriptorCount = tc.second;
+		pool_sizes.push_back(ps);
+	}
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.pNext = nullptr;
 	pool_info.maxSets = 1;
-	pool_info.poolSizeCount = 2;
-	pool_info.pPoolSizes = type_count;
+	pool_info.poolSizeCount = (uint32_t)pool_sizes.size();
+	pool_info.pPoolSizes = pool_sizes.data();
 
 	auto res = vkCreateDescriptorPool(GetEngine().device, &pool_info, nullptr, &descriptor_pool);
 	assert(res == VK_SUCCESS);
 }
 
-void Program::CreateUniformBuffer() {
-	uniform_buffer.BindBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	uniform_buffer.BufferData(sizeof(glm::mat4), nullptr);
+void Program::BindUniformBuffer(uint32_t set, uint32_t binding, const Buffer& buffer, uint32_t size) {
+	assert(set < descriptor_set.size());
+	VkDescriptorBufferInfo buffer_info;
+	buffer_info.buffer = buffer.buffer;
+	buffer_info.offset = 0;
+	buffer_info.range = size;
+	VkWriteDescriptorSet write;
+	write.pNext = nullptr;
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descriptor_set[set];
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	write.pImageInfo = nullptr;
+	write.pBufferInfo = &buffer_info;
+	write.pTexelBufferView = nullptr;
+	vkUpdateDescriptorSets(GetEngine().device, 1, &write, 0, nullptr);
 }
 
-void Program::CreateImage(const char * image) {
-	int width = 0, height = 0, channel = 0;
-	unsigned char* image_data = stbi_load(image, &width, &height, &channel, 4);
-	
-	sampled_image.TexImage2D(width, height, 4, image_data);
-
-	stbi_image_free(image_data);
+void Program::BindTexture(uint32_t set, uint32_t binding, const Texture & tex) {
+	assert(set < descriptor_set.size());
+	VkDescriptorImageInfo image_info;
+	image_info.imageView = tex.view;
+	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	image_info.sampler = tex.sampler;
+	VkWriteDescriptorSet write;
+	write.pNext = nullptr;
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descriptor_set[set];
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &image_info;
+	write.pBufferInfo = nullptr;
+	write.pTexelBufferView = nullptr;
+	vkUpdateDescriptorSets(GetEngine().device, 1, &write, 0, nullptr);
 }
 
-void Program::CreateSampler() {
-	VkSamplerCreateInfo sampler_info = {};
-	sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	sampler_info.magFilter = VK_FILTER_NEAREST;
-	sampler_info.minFilter = VK_FILTER_NEAREST;
-	sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	sampler_info.mipLodBias = 0.0;
-	sampler_info.anisotropyEnable = VK_FALSE;
-	sampler_info.maxAnisotropy = 1;
-	sampler_info.compareOp = VK_COMPARE_OP_NEVER;
-	sampler_info.minLod = 0.0;
-	sampler_info.maxLod = 0.0;
-	sampler_info.compareEnable = VK_FALSE;
-	sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+void Program::AddShaderUniform(uint32_t set, uint32_t binding, uint32_t stage, uint32_t type) {
+	Location loc;
+	loc.set = set;
+	loc.binding = binding;
+	auto& bindings = shader_layouts[loc.key];
+	bindings.binding = binding;
+	bindings.descriptorCount = 1;
+	bindings.pImmutableSamplers = nullptr;
+	bindings.stageFlags = (VkShaderStageFlags)stage;
+	bindings.descriptorType = (VkDescriptorType)type;
+}
 
-	/* create sampler */
-	auto res = vkCreateSampler(GetEngine().device, &sampler_info, NULL, &sampler);
-	assert(res == VK_SUCCESS);
+void Program::AddShaderUniform(uint32_t set, uint32_t binding) {
+	Location loc;
+	loc.set = set;
+	loc.binding = binding;
+	auto iter = shader_layouts.find(loc.key);
+	if (shader_layouts.end() != iter) {
+		iter->second.descriptorCount++;
+	}
 }
 
 void Program::AddVertexBuffer(float * data, size_t size) {
@@ -191,84 +229,66 @@ void Program::VertexAttribute(uint32_t binding, uint32_t location, uint32_t fmt,
 }
 
 void Program::CreateLayout() {
-	VkDescriptorSetLayoutBinding layout_bindings[2];
-	layout_bindings[0].binding = 0;
-	layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	layout_bindings[0].descriptorCount = 1;
-	layout_bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	layout_bindings[0].pImmutableSamplers = nullptr;
+	VkResult res;
 
-	layout_bindings[1].binding = 1;
-	layout_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	layout_bindings[1].descriptorCount = 1;
-	layout_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	layout_bindings[1].pImmutableSamplers = nullptr;
+	uint32_t set_num = 0;
+	{
+		auto last = shader_layouts.crbegin();
+		if (last != shader_layouts.crend()) {
+			Location last_loc;
+			last_loc.key = last->first;
+			set_num = last_loc.set + 1;
+		}
+	}
 
 	VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
 	descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptor_layout.pNext = nullptr;
 	descriptor_layout.flags = 0;
-	descriptor_layout.bindingCount = 2;
-	descriptor_layout.pBindings = layout_bindings;
+	descriptor_layout.bindingCount = 0;
+	descriptor_layout.pBindings = nullptr;
 
-	auto res = vkCreateDescriptorSetLayout(GetEngine().device, &descriptor_layout, nullptr, &descriptor_set_layout);
-	assert(res == VK_SUCCESS);
+	std::vector<VkDescriptorSetLayoutBinding> set_bindings{};
+	descriptor_set_layout.resize(set_num);
+	for (uint32_t i = 0; i < set_num; i++) {
+		set_bindings.clear();
+		for (const auto& sl : shader_layouts) {
+			Location loc;
+			loc.key = sl.first;
+			if (loc.set == i) {
+				set_bindings.push_back(sl.second);
+			}
+		}
+		descriptor_layout.bindingCount = (uint32_t)set_bindings.size();
+		descriptor_layout.pBindings = set_bindings.data();
+		res = vkCreateDescriptorSetLayout(GetEngine().device, &descriptor_layout, nullptr, &descriptor_set_layout[i]);
+		assert(res == VK_SUCCESS);
+	}
 
 	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
 	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_info.pNext = NULL;
 	pipeline_layout_info.pushConstantRangeCount = 0;
 	pipeline_layout_info.pPushConstantRanges = NULL;
-	pipeline_layout_info.setLayoutCount = 1;
-	pipeline_layout_info.pSetLayouts = &descriptor_set_layout;
+	pipeline_layout_info.setLayoutCount = (uint32_t)descriptor_set_layout.size();
+	pipeline_layout_info.pSetLayouts = descriptor_set_layout.data();
 
 	res = vkCreatePipelineLayout(GetEngine().device, &pipeline_layout_info, NULL, &pipeline_layout);
 	assert(res == VK_SUCCESS);
 }
 
 void Program::CreateDescriptorSet() {
+	descriptor_set.resize(descriptor_set_layout.size());
+
 	VkDescriptorSetAllocateInfo alloc_info[1];
 	alloc_info[0].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc_info[0].pNext = nullptr;
 	alloc_info[0].descriptorPool = descriptor_pool;
-	alloc_info[0].descriptorSetCount = 1;
-	alloc_info[0].pSetLayouts = &descriptor_set_layout;
+	alloc_info[0].descriptorSetCount = (uint32_t)descriptor_set_layout.size();
+	alloc_info[0].pSetLayouts = descriptor_set_layout.data();
 
-	auto res = vkAllocateDescriptorSets(GetEngine().device, alloc_info, &descriptor_set);
+	auto res = vkAllocateDescriptorSets(GetEngine().device, alloc_info, descriptor_set.data());
 	assert(res == VK_SUCCESS);
-
-	VkWriteDescriptorSet writes[2];
-
-	VkDescriptorBufferInfo buffer_info;
-	buffer_info.buffer = uniform_buffer.buffer;
-	buffer_info.offset = 0;
-	buffer_info.range = uniform_buffer.size;
-
-	VkDescriptorImageInfo image_info;
-	image_info.sampler = sampler;
-	image_info.imageView = sampled_image.view;
-	image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	writes[0] = {};
-	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[0].pNext = nullptr;
-	writes[0].dstSet = descriptor_set;
-	writes[0].descriptorCount = 1;
-	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	writes[0].pBufferInfo = &buffer_info;
-	writes[0].dstArrayElement = 0;
-	writes[0].dstBinding = 0;
-
-	writes[1] = {};
-	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[1].dstSet = descriptor_set;
-	writes[1].dstBinding = 1;
-	writes[1].descriptorCount = 1;
-	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writes[1].pImageInfo = &image_info;
-	writes[1].dstArrayElement = 0;
-
-	vkUpdateDescriptorSets(GetEngine().device, 2, writes, 0, nullptr);
 }
 
 void Program::AddShader(uint32_t stage, const char * filename) {
@@ -459,9 +479,6 @@ void Program::CreatePipeline() {
 void Program::Build() {
 	CreateRenderpass();
 	CreateFramebuffers();
-	CreateImage("resources/wall.jpg");
-	CreateSampler();
-	CreateUniformBuffer();
 
 	float vertices[] = {
 		-1.0f,  1.0f,  1.0f, 1.0f,
@@ -486,10 +503,7 @@ void Program::Build() {
 	VertexBinding(0, sizeof(float) * 4);
 	VertexBinding(1, sizeof(float) * 2);
 	CreateIndexBuffer(indices, sizeof(indices));
-	CreateLayout();
-	CreateDescriptorPool();
-	CreateDescriptorSet();
-
+	
 	AddShader(0x00000001, "resources/textured.vert.spv");
 	AddShader(0x00000010, "resources/textured.frag.spv");
 
@@ -537,7 +551,7 @@ void Program::Build() {
 		std::vector<VkDeviceSize> _offsets(vertex_buffers.size(), 0);
 		vkCmdBindVertexBuffers(cmd, 0, (uint32_t)_buffers.size(), _buffers.data(), _offsets.data());
 		vkCmdBindIndexBuffer(cmd, index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, (uint32_t)descriptor_set.size(), descriptor_set.data(), 0, nullptr);
 
 		vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
@@ -588,28 +602,6 @@ void Program::Draw() {
 	assert(res == VK_SUCCESS);
 }
 
-void Program::Update(float x, float y, float z) {
-	int width = 0, height = 0;
-	SDL_Vulkan_GetDrawableSize(gWindow, &width, &height);
-
-	float fov = glm::radians(45.0f);
-	if (width > height && width != 0 && height != 0) {
-		fov *= static_cast<float>(height) / static_cast<float>(width);
-	}
-	auto projection = glm::perspective(fov, static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
-	auto view = glm::lookAt(glm::vec3(x, y, z),  // Camera is at (-5,3,-10), in World Space
-		glm::vec3(0, 0, 0),     // and looks at the origin
-		glm::vec3(0, -1, 0)     // Head is up (set to 0,-1,0 to look upside-down)
-	);
-	auto model = glm::mat4(1.0f);
-	// Vulkan clip space has inverted Y and half Z.
-	auto clip = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.5f, 1.0f);
-
-	auto MVP = clip * projection * view * model;
-
-	GetEngine().CopyData(uniform_buffer.memory, &MVP, sizeof(MVP));
-}
-
 void Program::Clear() {
 	
 	auto& device = GetEngine().device;
@@ -627,16 +619,14 @@ void Program::Clear() {
 	vkDestroyPipelineCache(device, cache, nullptr);
 	vkDestroyPipeline(device, pipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-	vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
-	// vkFreeDescriptorSets(device, descriptor_pool, 1, &descriptor_set);
+	for (auto& dsl : descriptor_set_layout) {
+		vkDestroyDescriptorSetLayout(device, dsl, nullptr);
+	}
 	vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 	index_buffer.Clear();
-	uniform_buffer.Clear();
 	for (auto& buffer : vertex_buffers) {
 		buffer.Clear();
 	}
-	vkDestroySampler(device, sampler, nullptr);
-	sampled_image.Clear();
 }
 
 Program * CreateProgram() {
@@ -647,18 +637,6 @@ Program * CreateProgram() {
 void DestoryProgram(Program* program) {
 	program->Clear();
 	delete program;
-}
-
-void Build(Program* program) {
-	program->Build();
-}
-
-void Draw(Program* program) {
-	program->Draw();
-}
-
-void Update(Program* program, float x, float y, float z) {
-	program->Update(x, y, z);
 }
 
 }

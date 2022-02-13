@@ -9,5 +9,5 @@ layout (location = 1) in vec2 inTexCoords;
 layout (location = 0) out vec2 texcoord;
 void main() {
    texcoord = inTexCoords;
-   gl_Position = ubuf.mvp * pos;
+   gl_Position = pos;
 }

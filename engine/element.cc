@@ -48,6 +48,10 @@ void Buffer::BufferData(size_t size_, void* data) {
 	}
 }
 
+void Buffer::SetData(void * data, size_t size) {
+	GetEngine().CopyData(memory, &data, size);
+}
+
 void Buffer::Clear() {
 	GetEngine().DestroyBuffer(buffer, memory);
 }
@@ -98,9 +102,32 @@ void Texture::TexImage2D(uint32_t width_, uint32_t height_, uint32_t channel_, v
 	GetEngine().CreateImageView(image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1, view);
 }
 
+void Texture::EnableSampler() {
+	VkSamplerCreateInfo sampler_info = {};
+	sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler_info.magFilter = VK_FILTER_NEAREST;
+	sampler_info.minFilter = VK_FILTER_NEAREST;
+	sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler_info.mipLodBias = 0.0;
+	sampler_info.anisotropyEnable = VK_FALSE;
+	sampler_info.maxAnisotropy = 1;
+	sampler_info.compareOp = VK_COMPARE_OP_NEVER;
+	sampler_info.minLod = 0.0;
+	sampler_info.maxLod = 0.0;
+	sampler_info.compareEnable = VK_FALSE;
+	sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+	auto res = vkCreateSampler(GetEngine().device, &sampler_info, NULL, &sampler);
+	assert(res == VK_SUCCESS);
+}
+
 void Texture::Clear() {
 	GetEngine().DestroyImage(image, memory);
 	GetEngine().DestroyImageView(view);
+	vkDestroySampler(GetEngine().device, sampler, nullptr);
 }
 
 }

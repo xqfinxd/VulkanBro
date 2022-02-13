@@ -13,6 +13,8 @@ public:
 
 	void BufferData(size_t size, void* data);
 
+	void SetData(void* data, size_t size);
+
 	void Clear();
 
 	VkBuffer buffer;
@@ -27,12 +29,14 @@ struct Texture {
 	Texture();
 
 	void TexImage2D(uint32_t width, uint32_t height, uint32_t channel, void* data);
+	void EnableSampler();
 
 	void Clear();
 
 	VkImage image;
 	VkImageView view;
 	VkDeviceMemory memory;
+	VkSampler sampler;
 	uint32_t width{ 0 };
 	uint32_t height{ 0 };
 	uint32_t channel{ 0 };

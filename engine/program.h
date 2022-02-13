@@ -11,35 +11,47 @@
 
 namespace marble {
 
+union Location {
+	struct {
+		uint32_t binding;
+		uint32_t set;
+	};
+	uint64_t key;
+};
+
 struct Program {
 public:
 	Program();
+
+	void GetLayout();
 
 	void Build();
 
 	void Draw();
 
-	void Update(float x, float y, float z);
-
 	void Clear();
+
+	void BindUniformBuffer(uint32_t set, uint32_t binding, const Buffer& buffer, uint32_t size);
+
+	void BindTexture(uint32_t set, uint32_t binding, const Texture& tex);
+
+	void AddShaderUniform(uint32_t set, uint32_t binding, uint32_t stage, uint32_t type);
+	void AddShaderUniform(uint32_t set, uint32_t binding);
 
 	std::vector<VkCommandBuffer> cmds;
 	VkRenderPass renderpass;
 	std::vector<VkFramebuffer> framebuffers;
 	VkDescriptorPool descriptor_pool;
 
-	Buffer uniform_buffer;
-	Texture sampled_image;
-	VkSampler sampler;
-
 	std::vector<Buffer> vertex_buffers;
 	Buffer index_buffer;
 
 	std::vector<VkVertexInputBindingDescription> vertex_bindings;
 	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
+	std::map<uint64_t, VkDescriptorSetLayoutBinding> shader_layouts;
 
-	VkDescriptorSetLayout descriptor_set_layout;
-	VkDescriptorSet descriptor_set;
+	std::vector<VkDescriptorSetLayout> descriptor_set_layout;
+	std::vector<VkDescriptorSet> descriptor_set;
 	VkPipelineLayout pipeline_layout;
 
 	VkPipeline pipeline;
@@ -54,12 +66,6 @@ private:
 	void CreateFramebuffers();
 
 	void CreateDescriptorPool();
-
-	void CreateUniformBuffer();
-
-	void CreateImage(const char* image);
-
-	void CreateSampler();
 
 	void AddVertexBuffer(float* data, size_t size);
 
@@ -83,8 +89,5 @@ private:
 
 Program* CreateProgram();
 void DestoryProgram(Program*);
-void Build(Program*);
-void Draw(Program*);
-void Update(Program*, float x, float y, float z);
 
 }
