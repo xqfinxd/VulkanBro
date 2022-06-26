@@ -1,19 +1,99 @@
 #pragma once
 
 #include <vector>
+#include <array>
 
 #include <vulkan/vulkan.h>
+#include <SDL2/SDL.h>
 #include <glm/glm.hpp>
 
-/*
-VertexShader					= 0x00000001,
-TessellationControlShader		= 0x00000002,
-TessellationEvaluationShader	= 0x00000004,
-GeometryShader					= 0x00000008,
-FragmentShader					= 0x00000010,
-*/
+class Window {
+public:
+    void Create();
+    void Destroy();
 
-namespace marble {
+    glm::ivec2 GetSize() const;
+    glm::ivec2 GetDrawSize() const;
+
+    std::vector<const char*> GetExtensions() const;
+    VkSurfaceKHR GenerateSurface(const VkInstance& inst) const;
+
+private:
+    SDL_Window* window_{ nullptr };
+};
+
+enum QueueType : uint32_t {
+    eGraphics,
+    ePresent,
+    eMaxQueue,
+};
+
+class Engine {
+public:
+    
+    void Create();
+    void Destroy();
+
+private:
+    VkInstance instance_{};
+    VkDebugUtilsMessengerEXT debug_messenger_{};
+    VkPhysicalDevice gpu_{};
+    VkSurfaceKHR surface_{};
+    VkDevice device_{};
+    std::array<uint32_t, QueueType::eMaxQueue> queue_indices;
+    std::array<VkQueue, QueueType::eMaxQueue> queues{};
+    VkSwapchainKHR swapchain_{};
+    union {
+        uint32_t framebuffer_count_{ 0 };
+        uint32_t swapchain_image_count_;
+    };
+    uint32_t current_buffer_{ 0 };
+    std::unique_ptr<VkImage[]> color_images_{};
+    std::unique_ptr<VkImageView[]> color_imageviews_{};
+    VkImage depth_image_{};
+    VkDeviceMemory depth_memory_{};
+    VkImageView depth_imageview_{};
+    VkSemaphore image_available_semaphore_{};
+    VkSemaphore render_finished_semaphore_{};
+    
+public:
+    uint32_t queue_family_count{};
+    std::unique_ptr<VkQueueFamilyProperties[]> queue_family_properties{};
+    VkPhysicalDeviceProperties gpu_properties{};
+    VkPhysicalDeviceMemoryProperties memory_properties{};
+    VkFormat surface_format{ VK_FORMAT_UNDEFINED };
+    VkSurfaceCapabilitiesKHR surface_capabilities{};
+    std::vector<VkPresentModeKHR> present_modes{};
+    VkFormat depth_format{ VK_FORMAT_UNDEFINED };
+
+private:
+    bool GetMemoryType(uint32_t typeBits, VkFlags mask, uint32_t &typeIndex);
+
+    void CreateInstance();
+    void DestroyInstance();
+
+    void SetupDebugMessenger();
+    void UninstallDebugMessenger();
+
+    void GetGpuInfo();
+
+    void CreateSurface();
+    void DestroySurface();
+
+    void CreateDevice();
+    void DestroyDevice();
+
+    void GetQueue();
+
+    void CreateSwapchain();
+    void DestroySwapchain();
+
+    void CreateDepthImage();
+    void DestroyDepthImage();
+
+    void CreateSemaphore();
+    void DestroySemaphore();
+};
 
 struct VkSwapchainImage {
 	VkImage image;
@@ -27,107 +107,5 @@ struct VkImageDescriptor {
 	VkDeviceMemory memory;
 };
 
-struct VkBufferDescriptor {
-	VkBuffer buffer;
-	VkDeviceMemory memory;
-	size_t size;
-};
-
-class Engine {
-public:
-	VkInstance instance{};
-	VkDebugUtilsMessengerEXT debug_messenger{};
-	VkPhysicalDevice gpu{ VK_NULL_HANDLE };
-	uint32_t queue_family_count{};
-	std::vector<VkQueueFamilyProperties> queue_family_properties{};
-	VkPhysicalDeviceProperties gpu_properties{};
-	VkPhysicalDeviceMemoryProperties memory_properties{};
-	VkSurfaceKHR surface{};
-	uint32_t graphics_queue_family_index{ UINT32_MAX };
-	uint32_t present_queue_family_index{ UINT32_MAX };
-	VkFormat format{ VK_FORMAT_UNDEFINED };
-	VkDevice device{};
-	VkCommandPool command_pool{};
-	VkQueue graphics_queue{};
-	VkQueue present_queue{};
-	uint32_t swapchain_image_count{};
-	VkSwapchainKHR swapchain{};
-	std::vector<VkSwapchainImage> swapchain_images{};
-	VkImageDescriptor depth_image{};
-	uint32_t current_buffer{ 0 };
-	VkSemaphore image_acquired_semaphore;
-	VkSemaphore draw_complete_semaphore;
-	VkFence fence;
-	VkCommandPool cmd_pool;
-	std::vector<VkCommandBuffer> cmds;
-
-	Engine();
-	~Engine();
-
-	void Init();
-	void Quit();
-
-	bool GetMemoryType(uint32_t type_bits, VkFlags mask, uint32_t &type_index);
-
-	bool NextImage();
-
-	void SetImageLayout(VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout old_image_layout,
-		VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);
-
-	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
-		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& memory);
-	void DestroyBuffer(VkBuffer& buffer, VkDeviceMemory& memory);
-
-	void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& memory);
-	void DestroyImage(VkImage& image, VkDeviceMemory& memory);
-
-	void CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags, uint32_t miplevels, VkImageView& view);
-	void DestroyImageView(VkImageView& view);
-
-	void CopyBuffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
-	void CopyData(VkDeviceMemory& memory, void* data, size_t size);
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-
-	void CreateShaderModule(VkShaderModule& shader_module, uint32_t* data, size_t size);
-	void DestroyShaderModule(VkShaderModule& shader_module);
-
-	VkCommandBuffer GenCmd(bool secondary, bool join);
-	void FreeCmd(VkCommandBuffer& cmd);
-
-private:
-	void CreateInstance();
-	void DestroyInstance();
-
-	void SetupDebugMessenger();
-	void UninstallDebugMessenger();
-
-	void InitGpuInfo();
-
-	void CreateSurface();
-	void DestroySurface();
-
-	void CreateDevice();
-	void DestroyDevice();
-
-	void InitQueue();
-
-	void CreateSwapchain();
-	void DestroySwapchain();
-
-	void CreateDepthImage();
-	void DestroyDepthImage();
-
-	void CreateFenceAndSemaphore();
-	void DestroyFenceAndSemaphore();
-
-	void CreateCmdPool();
-	void DestroyCmdPool();
-
-	VkCommandBuffer BeginOnceCmd();
-	void EndOnceCmd(VkCommandBuffer& cmd);
-
-};
-
+Window& GetWindow();
 Engine& GetEngine();
-
-}
