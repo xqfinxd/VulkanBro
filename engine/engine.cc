@@ -174,7 +174,7 @@ void Engine::GetGpuInfo() {
 }
 
 void Engine::CreateSurface() {
-    surface_ = GetWindow().GenerateSurface(instance_);
+    surface_ = GetWindow().GenSurface(instance_);
 	std::vector<VkBool32> supportsPresent = std::vector<VkBool32>(queue_family_count);
 	for (uint32_t i = 0; i < queue_family_count; i++) {
 		vkGetPhysicalDeviceSurfaceSupportKHR(gpu_, i, surface_, &supportsPresent[i]);
@@ -548,7 +548,7 @@ std::vector<const char*> Window::GetExtensions() const
     return extensions;
 }
 
-VkSurfaceKHR Window::GenerateSurface(const VkInstance & inst) const
+VkSurfaceKHR Window::GenSurface(const VkInstance & inst) const
 {
     VkSurfaceKHR surface;
     SDL_bool res = SDL_Vulkan_CreateSurface(window_, inst, &surface);
