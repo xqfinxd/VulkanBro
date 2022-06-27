@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <functional>
 
 #include <vulkan/vulkan.h>
 #include <SDL2/SDL.h>
@@ -16,7 +17,7 @@ public:
     glm::ivec2 GetDrawSize() const;
 
     std::vector<const char*> GetExtensions() const;
-    VkSurfaceKHR GenerateSurface(const VkInstance& inst) const;
+    VkSurfaceKHR GenSurface(const VkInstance& inst) const;
 
 private:
     SDL_Window* window_{ nullptr };
@@ -33,6 +34,13 @@ public:
     
     void Create();
     void Destroy();
+
+    void Enable(IElement& element) {
+        element.device_ = device_;
+    }
+    void Destroy(IElement& element) {
+        element.deleter_(element);
+    }
 
 private:
     VkInstance instance_{};
@@ -95,16 +103,25 @@ private:
     void DestroySemaphore();
 };
 
-struct VkSwapchainImage {
-	VkImage image;
-	VkImageView view;
-};
+class IElement {
+    friend class Engine;
+public:
+    IElement() = default;
+    ~IElement() = default;
 
-struct VkImageDescriptor {
-	VkFormat format;
-	VkImage image;
-	VkImageView view;
-	VkDeviceMemory memory;
+protected:
+    typedef std::function<void(IElement&)> Deleter;
+    const VkDevice& GetDevice() const {
+        return device_;
+    }
+
+    void SetDeleter(Deleter deleter) {
+        deleter_ = deleter;
+    }
+
+private:
+    VkDevice device_;
+    Deleter deleter_;
 };
 
 Window& GetWindow();
