@@ -35,13 +35,6 @@ public:
     void Create();
     void Destroy();
 
-    void Enable(IElement& element) {
-        element.device_ = device_;
-    }
-    void Destroy(IElement& element) {
-        element.deleter_(element);
-    }
-
 private:
     VkInstance instance_{};
     VkDebugUtilsMessengerEXT debug_messenger_{};
@@ -103,25 +96,15 @@ private:
     void DestroySemaphore();
 };
 
-class IElement {
-    friend class Engine;
+class Buffer {
 public:
-    IElement() = default;
-    ~IElement() = default;
 
-protected:
-    typedef std::function<void(IElement&)> Deleter;
-    const VkDevice& GetDevice() const {
-        return device_;
-    }
-
-    void SetDeleter(Deleter deleter) {
-        deleter_ = deleter;
-    }
 
 private:
     VkDevice device_;
-    Deleter deleter_;
+    uint32_t size_{ 0 };
+    VkBufferUsageFlags usage_{ 0 };
+    VkMemoryPropertyFlags memprop_{ 0 };
 };
 
 Window& GetWindow();
